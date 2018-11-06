@@ -45,10 +45,13 @@ public class ElementInstanceState {
       "elementInstanceStateTokenEvents".getBytes();
   private static final byte[] TOKEN_PARENT_CHILD_KEY_FAMILY_NAME =
       "elementInstanceStateTokenParentChild".getBytes();
+  private static final byte[] ELEMENT_CHILD_PARENT_KEY_FAMILY_NAME =
+      "elementInstanceStateElementChildParent".getBytes();
   private static final byte[] EMPTY_VALUE = new byte[1];
 
   public static final byte[][] COLUMN_FAMILY_NAMES = {
     ELEMENT_PARENT_CHILD_KEY_FAMILY_NAME,
+    ELEMENT_CHILD_PARENT_KEY_FAMILY_NAME,
     ELEMENT_INSTANCE_KEY_FAMILY_NAME,
     TOKEN_EVENTS_KEY_FAMILY_NAME,
     TOKEN_PARENT_CHILD_KEY_FAMILY_NAME
@@ -66,6 +69,7 @@ public class ElementInstanceState {
   private final UnsafeBuffer iterateKeyBuffer = new UnsafeBuffer(0, 0);
 
   private final ColumnFamilyHandle elementParentChildHandle;
+  private final ColumnFamilyHandle elementChildParentHandle;
   private final ColumnFamilyHandle elementInstanceHandle;
 
   // key => record
@@ -84,6 +88,8 @@ public class ElementInstanceState {
 
     elementParentChildHandle =
         rocksDbWrapper.getColumnFamilyHandle(ELEMENT_PARENT_CHILD_KEY_FAMILY_NAME);
+    elementChildParentHandle =
+        rocksDbWrapper.getColumnFamilyHandle(ELEMENT_CHILD_PARENT_KEY_FAMILY_NAME);
     elementInstanceHandle = rocksDbWrapper.getColumnFamilyHandle(ELEMENT_INSTANCE_KEY_FAMILY_NAME);
     tokenEventHandle = rocksDbWrapper.getColumnFamilyHandle(TOKEN_EVENTS_KEY_FAMILY_NAME);
     tokenParentChildHandle =
@@ -115,19 +121,28 @@ public class ElementInstanceState {
   private void writeElementInstance(ElementInstance instance) {
     final int parentKeyOffset = 0;
     instance.writeParentKey(keyBuffer, parentKeyOffset);
-    final int instanceKeyOffset = instance.getParentKeyLength();
-    instance.writeKey(keyBuffer, instanceKeyOffset);
+    final int childKeyOffset = instance.getParentKeyLength();
+    instance.writeKey(keyBuffer, childKeyOffset);
     instance.write(valueBuffer, 0);
 
     final int keyLength = instance.getKeyLength();
     rocksDbWrapper.put(
         elementInstanceHandle,
         keyBuffer.byteArray(),
-        instanceKeyOffset,
+        childKeyOffset,
         keyLength,
         valueBuffer.byteArray(),
         0,
         instance.getLength());
+
+    rocksDbWrapper.put(
+        elementChildParentHandle,
+        keyBuffer.byteArray(),
+        childKeyOffset,
+        keyLength,
+        keyBuffer.byteArray(),
+        parentKeyOffset,
+        instance.getParentKeyLength());
 
     final int compositeKeyLength = keyLength + instance.getParentKeyLength();
     rocksDbWrapper.put(
@@ -162,6 +177,11 @@ public class ElementInstanceState {
 
       rocksDbWrapper.remove(
           elementParentChildHandle, keyBuffer.byteArray(), parentKeyOffset, compositeKeyLength);
+      rocksDbWrapper.remove(
+          elementParentChildHandle,
+          keyBuffer.byteArray(),
+          instanceKeyOffset,
+          instance.getKeyLength());
       rocksDbWrapper.remove(
           elementInstanceHandle, keyBuffer.byteArray(), instanceKeyOffset, instance.getKeyLength());
       cachedInstances.remove(key);
