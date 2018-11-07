@@ -66,7 +66,7 @@ import org.junit.rules.RuleChain;
 public class ActivateJobsTest {
 
   public static final String JOB_TYPE = "theJobType";
-  public static final byte[] PAYLOAD_MSG_PACK = MsgPackUtil.asMsgPack("{\"foo\": \"bar\"}");
+  public static final byte[] PAYLOAD_MSG_PACK = MsgPackUtil.asMsgPackArray("{\"foo\": \"bar\"}");
 
   public EmbeddedBrokerRule brokerRule = new EmbeddedBrokerRule();
 

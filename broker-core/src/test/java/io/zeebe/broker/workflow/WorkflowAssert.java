@@ -84,7 +84,7 @@ public class WorkflowAssert {
 
   public static void assertWorkflowInstancePayload(
       Record<WorkflowInstanceRecordValue> event, String expectedPayload) {
-    final byte[] payload = MsgPackUtil.asMsgPack(event.getValue().getPayload());
+    final byte[] payload = MsgPackUtil.asMsgPackArray(event.getValue().getPayload());
     MsgPackUtil.assertEquality(payload, expectedPayload);
   }
 

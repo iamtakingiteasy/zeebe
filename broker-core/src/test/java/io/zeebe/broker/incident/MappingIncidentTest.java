@@ -333,7 +333,7 @@ public class MappingIncidentTest {
     testClient.createWorkflowInstance("process", MSGPACK_PAYLOAD);
 
     // when
-    testClient.completeJobOfType("external", MsgPackUtil.asMsgPack("{'testAttr':'test'}"));
+    testClient.completeJobOfType("external", MsgPackUtil.asMsgPackArray("{'testAttr':'test'}"));
     testClient.receiveFirstWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATED);
 
     // then incident is created
@@ -360,7 +360,7 @@ public class MappingIncidentTest {
     final long workflowInstanceKey = testClient.createWorkflowInstance("process", MSGPACK_PAYLOAD);
 
     // when
-    testClient.completeJobOfType("external", MsgPackUtil.asMsgPack("{'testAttr':'test'}"));
+    testClient.completeJobOfType("external", MsgPackUtil.asMsgPackArray("{'testAttr':'test'}"));
     testClient.receiveFirstWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATED);
 
     // then incident is created

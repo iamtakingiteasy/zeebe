@@ -47,6 +47,7 @@ public class ElementInstanceState {
       "elementInstanceStateTokenParentChild".getBytes();
   private static final byte[] ELEMENT_CHILD_PARENT_KEY_FAMILY_NAME =
       "elementInstanceStateElementChildParent".getBytes();
+  private static final byte[] VARIABLES_FAMILY_NAME = "elementInstanceStateVariables".getBytes();
   private static final byte[] EMPTY_VALUE = new byte[1];
 
   public static final byte[][] COLUMN_FAMILY_NAMES = {
@@ -54,7 +55,8 @@ public class ElementInstanceState {
     ELEMENT_CHILD_PARENT_KEY_FAMILY_NAME,
     ELEMENT_INSTANCE_KEY_FAMILY_NAME,
     TOKEN_EVENTS_KEY_FAMILY_NAME,
-    TOKEN_PARENT_CHILD_KEY_FAMILY_NAME
+    TOKEN_PARENT_CHILD_KEY_FAMILY_NAME,
+    VARIABLES_FAMILY_NAME
   };
 
   private final StateController rocksDbWrapper;
@@ -77,7 +79,12 @@ public class ElementInstanceState {
   // (element instance key, purpose) => token event key
   private final ColumnFamilyHandle tokenParentChildHandle;
 
+  // (scope key, variable name) => (variable value)
+  private final ColumnFamilyHandle variablesHandle;
+
   private final Map<Long, ElementInstance> cachedInstances = new HashMap<>();
+
+  private final VariablesState variablesState;
 
   public ElementInstanceState(StateController rocksDbWrapper) {
     this.rocksDbWrapper = rocksDbWrapper;
@@ -94,6 +101,9 @@ public class ElementInstanceState {
     tokenEventHandle = rocksDbWrapper.getColumnFamilyHandle(TOKEN_EVENTS_KEY_FAMILY_NAME);
     tokenParentChildHandle =
         rocksDbWrapper.getColumnFamilyHandle(TOKEN_PARENT_CHILD_KEY_FAMILY_NAME);
+    variablesHandle = rocksDbWrapper.getColumnFamilyHandle(VARIABLES_FAMILY_NAME);
+
+    variablesState = new VariablesState(rocksDbWrapper, elementChildParentHandle, variablesHandle);
   }
 
   public ElementInstance newInstance(
@@ -194,6 +204,8 @@ public class ElementInstanceState {
           (k, v) -> {
             rocksDbWrapper.remove(tokenEventHandle, getLong(k, Long.BYTES + BitUtil.SIZE_OF_BYTE));
           });
+
+      variablesState.removeAllVariables(key);
 
       final long parentKey = instance.getParentKey();
       if (parentKey > 0) {
@@ -329,6 +341,10 @@ public class ElementInstanceState {
           records.add(tokenEvent.getRecord());
         });
     return records;
+  }
+
+  public VariablesState getVariablesState() {
+    return variablesState;
   }
 
   private static long getLong(byte[] array, int offset) {

@@ -340,7 +340,7 @@ public class WorkflowTaskIOMappingTest {
     // when
     testClient.completeJobOfWorkflowInstance("external", firstWFInstanceKey, MSGPACK_PAYLOAD);
     testClient.completeJobOfWorkflowInstance(
-        "external", secondWFInstanceKey, MsgPackUtil.asMsgPack("{'foo':'bar'}"));
+        "external", secondWFInstanceKey, MsgPackUtil.asMsgPackArray("{'foo':'bar'}"));
 
     // then first event payload is expected as
     assertRecordPayload(
@@ -369,12 +369,12 @@ public class WorkflowTaskIOMappingTest {
     final long firstWFInstanceKey = testClient.createWorkflowInstance("process", MSGPACK_PAYLOAD);
     final long secondWFInstanceKey =
         testClient.createWorkflowInstance(
-            "process", MsgPackUtil.asMsgPack("{'otherPayload':'value'}"));
+            "process", MsgPackUtil.asMsgPackArray("{'otherPayload':'value'}"));
 
     // when
     testClient.completeJobOfWorkflowInstance("external", firstWFInstanceKey, MSGPACK_PAYLOAD);
     testClient.completeJobOfWorkflowInstance(
-        "external", secondWFInstanceKey, MsgPackUtil.asMsgPack("{'foo':'bar'}"));
+        "external", secondWFInstanceKey, MsgPackUtil.asMsgPackArray("{'foo':'bar'}"));
 
     // then first event payload is expected as
     assertRecordPayload(
@@ -478,7 +478,7 @@ public class WorkflowTaskIOMappingTest {
     assertRecordPayload(JobIntent.CREATE, "{'testAttr':'test'}");
 
     // when
-    testClient.completeJobOfType("external", MsgPackUtil.asMsgPack("{'testAttr':123}"));
+    testClient.completeJobOfType("external", MsgPackUtil.asMsgPackArray("{'testAttr':123}"));
 
     // then
     assertRecordPayload(

@@ -81,7 +81,7 @@ public class UpdatePayloadTest {
 
     // when
     final ExecuteCommandResponse response =
-        updatePayload(activityInstanceEvent.getKey(), MsgPackUtil.asMsgPack("{'foo':'bar'}"));
+        updatePayload(activityInstanceEvent.getKey(), MsgPackUtil.asMsgPackArray("{'foo':'bar'}"));
 
     // then
     assertThat(response.getIntent()).isEqualTo(WorkflowInstanceIntent.PAYLOAD_UPDATED);
@@ -154,7 +154,7 @@ public class UpdatePayloadTest {
         waitForActivityActivatedEvent();
 
     // when
-    updatePayload(activityInstanceEvent.getKey(), MsgPackUtil.asMsgPack("{'b':'wf'}"));
+    updatePayload(activityInstanceEvent.getKey(), MsgPackUtil.asMsgPackArray("{'b':'wf'}"));
 
     testClient.receiveFirstWorkflowInstanceEvent(WorkflowInstanceIntent.PAYLOAD_UPDATED);
 
@@ -183,7 +183,7 @@ public class UpdatePayloadTest {
         testClient.receiveFirstWorkflowInstanceEvent(WorkflowInstanceIntent.ELEMENT_ACTIVATED);
 
     // when
-    updatePayload(catchEventEntered.getKey(), MsgPackUtil.asMsgPack("{'id':'123', 'x': 1}"));
+    updatePayload(catchEventEntered.getKey(), MsgPackUtil.asMsgPackArray("{'id':'123', 'x': 1}"));
 
     testClient.receiveFirstWorkflowInstanceEvent(WorkflowInstanceIntent.PAYLOAD_UPDATED);
 
@@ -207,7 +207,8 @@ public class UpdatePayloadTest {
     // when
     final Throwable throwable =
         catchThrowable(
-            () -> updatePayload(activityInstanceEvent.getKey(), MsgPackUtil.asMsgPack("'foo'")));
+            () ->
+                updatePayload(activityInstanceEvent.getKey(), MsgPackUtil.asMsgPackArray("'foo'")));
 
     // then
     assertThat(throwable).isInstanceOf(RuntimeException.class);

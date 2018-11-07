@@ -174,7 +174,7 @@ public class ParallelGatewayTest {
             .collect(Collectors.toList());
 
     assertThat(taskEvents)
-        .extracting(e -> MsgPackUtil.asMsgPack(e.getValue().getPayload()))
+        .extracting(e -> MsgPackUtil.asMsgPackArray(e.getValue().getPayload()))
         .allSatisfy(p -> p.equals(payload));
   }
 

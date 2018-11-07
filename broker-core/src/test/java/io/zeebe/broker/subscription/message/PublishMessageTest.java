@@ -83,7 +83,7 @@ public class PublishMessageTest {
     final Record<MessageRecordValue> publishedEvent =
         testClient.receiveFirstMessageEvent(MessageIntent.PUBLISHED);
     assertThat(publishedEvent.getKey()).isEqualTo(response.getKey());
-    assertThat(MsgPackUtil.asMsgPack(publishedEvent.getValue().getPayload()))
+    assertThat(MsgPackUtil.asMsgPackArray(publishedEvent.getValue().getPayload()))
         .isEqualTo(EMTPY_OBJECT);
 
     Assertions.assertThat(publishedEvent.getValue())
@@ -281,7 +281,8 @@ public class PublishMessageTest {
     final Record<MessageRecordValue> deletedEvent =
         testClient.receiveFirstMessageEvent(MessageIntent.DELETED);
     assertThat(deletedEvent.getKey()).isEqualTo(response.getKey());
-    assertThat(MsgPackUtil.asMsgPack(deletedEvent.getValue().getPayload())).isEqualTo(EMTPY_OBJECT);
+    assertThat(MsgPackUtil.asMsgPackArray(deletedEvent.getValue().getPayload()))
+        .isEqualTo(EMTPY_OBJECT);
 
     Assertions.assertThat(deletedEvent.getValue())
         .hasName("order canceled")
@@ -312,7 +313,8 @@ public class PublishMessageTest {
         testClient.receiveFirstMessageEvent(MessageIntent.DELETED);
 
     assertThat(deletedEvent.getKey()).isEqualTo(response.getKey());
-    assertThat(MsgPackUtil.asMsgPack(deletedEvent.getValue().getPayload())).isEqualTo(EMTPY_OBJECT);
+    assertThat(MsgPackUtil.asMsgPackArray(deletedEvent.getValue().getPayload()))
+        .isEqualTo(EMTPY_OBJECT);
 
     Assertions.assertThat(deletedEvent.getValue())
         .hasName("order canceled")
