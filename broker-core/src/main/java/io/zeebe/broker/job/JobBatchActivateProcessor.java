@@ -23,20 +23,32 @@ import io.zeebe.broker.logstreams.processor.TypedRecord;
 import io.zeebe.broker.logstreams.processor.TypedRecordProcessor;
 import io.zeebe.broker.logstreams.processor.TypedResponseWriter;
 import io.zeebe.broker.logstreams.processor.TypedStreamWriter;
+import io.zeebe.broker.workflow.state.WorkflowState;
+import io.zeebe.msgpack.value.StringValue;
+import io.zeebe.msgpack.value.ValueArray;
 import io.zeebe.protocol.clientapi.RejectionType;
 import io.zeebe.protocol.impl.record.value.job.JobBatchRecord;
 import io.zeebe.protocol.impl.record.value.job.JobRecord;
+import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceRecord;
 import io.zeebe.protocol.intent.JobBatchIntent;
 import io.zeebe.protocol.intent.JobIntent;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.ObjectHashSet;
+import org.agrona.concurrent.UnsafeBuffer;
 
 public class JobBatchActivateProcessor implements TypedRecordProcessor<JobBatchRecord> {
 
   private final JobState state;
+  private final WorkflowState workflowState;
+  private final ObjectHashSet<DirectBuffer> variableNames = new ObjectHashSet<>();
 
-  public JobBatchActivateProcessor(final JobState state) {
+  public JobBatchActivateProcessor(JobState state, WorkflowState workflowState) {
     this.state = state;
+    this.workflowState = workflowState;
   }
 
   @Override
@@ -68,6 +80,18 @@ public class JobBatchActivateProcessor implements TypedRecordProcessor<JobBatchR
     final long jobBatchKey = streamWriter.getKeyGenerator().nextKey();
 
     final AtomicInteger amount = new AtomicInteger(value.getAmount());
+
+    // TODO: put variable names in set here
+    variableNames.clear();
+    final ValueArray<StringValue> variables = value.variables();
+
+    variables.forEach(
+        v -> {
+          final MutableDirectBuffer nameCopy = new UnsafeBuffer(new byte[v.getValue().capacity()]);
+          nameCopy.putBytes(0, v.getValue(), 0, v.getValue().capacity());
+          variableNames.add(nameCopy);
+        });
+
     state.forEachActivatableJobs(
         value.getType(),
         (key, jobRecord, control) -> {
@@ -85,6 +109,15 @@ public class JobBatchActivateProcessor implements TypedRecordProcessor<JobBatchR
             // set worker properties on job
             job.setDeadline(deadline).setWorker(value.getWorker());
 
+            final long elementInstanceKey = job.getHeaders().getElementInstanceKey();
+
+            if (elementInstanceKey >= 0) {
+              final DirectBuffer payload = collectPayload(variableNames, elementInstanceKey);
+              job.setPayload(payload);
+            } else {
+              job.setPayload(WorkflowInstanceRecord.EMPTY_PAYLOAD);
+            }
+
             // update state and write follow up event for job record
             state.activate(key, job);
             streamWriter.appendFollowUpEvent(key, JobIntent.ACTIVATED, job);
@@ -97,6 +130,25 @@ public class JobBatchActivateProcessor implements TypedRecordProcessor<JobBatchR
 
     streamWriter.appendFollowUpEvent(jobBatchKey, JobBatchIntent.ACTIVATED, value);
     responseWriter.writeEventOnCommand(jobBatchKey, JobBatchIntent.ACTIVATED, value, record);
+  }
+
+  private DirectBuffer collectPayload(
+      Collection<DirectBuffer> variableNames, long elementInstanceKey) {
+    final DirectBuffer payload;
+    if (variableNames.isEmpty()) {
+      payload =
+          workflowState
+              .getElementInstanceState()
+              .getVariablesState()
+              .getVariablesAsDocument(elementInstanceKey);
+    } else {
+      payload =
+          workflowState
+              .getElementInstanceState()
+              .getVariablesState()
+              .getVariablesAsDocument(elementInstanceKey, variableNames);
+    }
+    return payload;
   }
 
   private void rejectCommand(

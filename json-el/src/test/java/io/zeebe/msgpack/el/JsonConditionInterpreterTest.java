@@ -15,6 +15,7 @@
  */
 package io.zeebe.msgpack.el;
 
+import static io.zeebe.test.util.MsgPackUtil.asMsgPack;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;

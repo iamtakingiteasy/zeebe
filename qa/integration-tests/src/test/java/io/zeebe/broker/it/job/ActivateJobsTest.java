@@ -98,7 +98,7 @@ public class ActivateJobsTest {
             ActivatedJob::getWorker,
             ActivatedJob::getCustomHeaders,
             ActivatedJob::getPayloadAsMap)
-        .containsOnly(tuple(JOB_TYPE, worker, CUSTOM_HEADERS, PAYLOAD));
+        .containsOnly(tuple(JOB_TYPE, worker, CUSTOM_HEADERS, Collections.EMPTY_MAP));
 
     final List<Instant> deadlines =
         jobRecords(JobIntent.ACTIVATED)

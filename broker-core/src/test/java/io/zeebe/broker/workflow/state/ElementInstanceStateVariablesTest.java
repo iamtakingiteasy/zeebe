@@ -30,6 +30,7 @@ import io.zeebe.test.util.AutoCloseableRule;
 import io.zeebe.test.util.MsgPackUtil;
 import io.zeebe.util.buffer.BufferUtil;
 import java.util.Arrays;
+import java.util.Collections;
 import org.agrona.DirectBuffer;
 import org.junit.Before;
 import org.junit.Rule;
@@ -268,6 +269,23 @@ public class ElementInstanceStateVariablesTest {
     final DirectBuffer varB = variablesState.getVariableLocal(child, BufferUtil.wrapString("b"));
     MsgPackUtil.assertEquality(varB, "2");
     assertThat(variablesState.getVariableLocal(parent, BufferUtil.wrapString("b"))).isNull();
+  }
+
+  @Test
+  public void shouldSetLocalVariableFromDocumentAsObject() {
+    // given
+    final long scope = 1;
+    declareScope(scope);
+
+    final DirectBuffer document =
+        MsgPackUtil.asMsgPack(b -> b.put("var", Collections.singletonMap("a", 1)));
+
+    // when
+    variablesState.setVariablesLocalFromDocument(scope, document);
+
+    // then
+    final DirectBuffer varA = variablesState.getVariableLocal(scope, BufferUtil.wrapString("var"));
+    MsgPackUtil.assertEquality(varA, "{'a': 1}");
   }
 
   @Test

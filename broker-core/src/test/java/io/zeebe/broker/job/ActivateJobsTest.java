@@ -204,8 +204,9 @@ public class ActivateJobsTest {
             entry("retries", 3L),
             entry("worker", worker),
             entry("deadline", deadline.toEpochMilli()),
-            entry("type", JOB_TYPE),
-            entry("payload", PAYLOAD_MSG_PACK));
+            entry("type", JOB_TYPE));
+
+    MsgPackUtil.assertEquality((byte[]) jobs.get(0).get("payload"), "{}");
 
     final Record<JobRecordValue> jobRecord = jobRecords(JobIntent.ACTIVATED).getFirst();
     assertThat(jobRecord).hasKey(expectedJobKey);
@@ -354,6 +355,7 @@ public class ActivateJobsTest {
 
     // when
     final Job job = activateJobs(jobType, worker, timeout, 1).get(0);
+
     // then
     final Map<String, Object> value = job.getValue();
     assertThat(value)
@@ -361,8 +363,9 @@ public class ActivateJobsTest {
             entry("type", jobType),
             entry("worker", worker),
             entry("retries", 3L),
-            entry("deadline", deadline.toEpochMilli()),
-            entry("payload", PAYLOAD_MSG_PACK));
+            entry("deadline", deadline.toEpochMilli()));
+
+    MsgPackUtil.assertEquality((byte[]) value.get("payload"), "{'foo': 'bar'}");
 
     final Map<String, Object> headers = (Map<String, Object>) value.get("headers");
     final Headers jobRecordHeaders = jobRecord.getValue().getHeaders();
