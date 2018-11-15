@@ -15,6 +15,7 @@
  */
 package io.zeebe.gateway.impl.broker.request;
 
+import io.zeebe.gateway.protocol.GatewayOuterClass.FailJobRequest;
 import io.zeebe.protocol.clientapi.ValueType;
 import io.zeebe.protocol.impl.record.value.job.JobRecord;
 import io.zeebe.protocol.intent.JobIntent;
@@ -24,10 +25,11 @@ public class BrokerFailJobRequest extends BrokerExecuteCommand<JobRecord> {
 
   private final JobRecord requestDto = new JobRecord();
 
-  public BrokerFailJobRequest(long key, int retries) {
+  public BrokerFailJobRequest(FailJobRequest failJobRequest) {
     super(ValueType.JOB, JobIntent.FAIL);
-    request.setKey(key);
-    requestDto.setRetries(retries);
+    request.setKey(failJobRequest.getJobKey());
+    requestDto.setRetries(failJobRequest.getRetries());
+    requestDto.setErrorMessage(failJobRequest.getErrorMessage());
   }
 
   @Override
