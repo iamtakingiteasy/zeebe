@@ -25,6 +25,6 @@ public class TerminateIntermediateMessageHandler
     extends TerminateFlowNodeHandler<ExecutableIntermediateCatchElement> {
   @Override
   protected void terminate(BpmnStepContext<ExecutableIntermediateCatchElement> context) {
-    context.getCatchEventOutput().unsubscribeFromMessageEvent(context);
+    context.getCatchEventOutput().unsubscribeFromMessageEvents(context);
   }
 }

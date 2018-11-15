@@ -519,7 +519,8 @@ public class WorkflowInstanceStreamProcessorTest {
         .closeMessageSubscription(
             subscription.getSubscriptionPartitionId(),
             subscription.getWorkflowInstanceKey(),
-            subscription.getElementInstanceKey());
+            subscription.getElementInstanceKey(),
+            subscription.getMessageName());
   }
 
   @Test
