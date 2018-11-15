@@ -15,9 +15,13 @@
  */
 package io.zeebe.gateway.impl.broker.request;
 
+import io.zeebe.msgpack.value.StringValue;
+import io.zeebe.msgpack.value.ValueArray;
 import io.zeebe.protocol.clientapi.ValueType;
 import io.zeebe.protocol.impl.record.value.job.JobBatchRecord;
 import io.zeebe.protocol.intent.JobBatchIntent;
+import io.zeebe.util.buffer.BufferUtil;
+import java.util.Collection;
 import org.agrona.DirectBuffer;
 
 public class BrokerActivateJobsRequest extends BrokerExecuteCommand<JobBatchRecord> {
@@ -41,6 +45,16 @@ public class BrokerActivateJobsRequest extends BrokerExecuteCommand<JobBatchReco
 
   public BrokerActivateJobsRequest setAmount(int amount) {
     requestDto.setAmount(amount);
+    return this;
+  }
+
+  public BrokerActivateJobsRequest addVariables(Collection<String> variables) {
+    final ValueArray<StringValue> variablesArray = requestDto.variables();
+    for (String variable : variables) {
+      final StringValue newValue = variablesArray.add();
+      newValue.wrap(BufferUtil.wrapString(variable));
+    }
+
     return this;
   }
 

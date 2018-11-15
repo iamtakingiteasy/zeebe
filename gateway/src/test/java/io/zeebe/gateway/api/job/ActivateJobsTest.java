@@ -25,6 +25,7 @@ import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsResponse;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ActivatedJob;
 import io.zeebe.protocol.impl.record.value.job.JobBatchRecord;
 import io.zeebe.test.util.JsonUtil;
+import io.zeebe.util.buffer.BufferUtil;
 import java.time.Duration;
 import java.util.Iterator;
 import org.junit.Test;
@@ -48,6 +49,9 @@ public class ActivateJobsTest extends GatewayTest {
             .setWorker(worker)
             .setAmount(amount)
             .setTimeout(timeout.toMillis())
+            .addVariables("var1")
+            .addVariables("var2")
+            .addVariables("var3")
             .build();
 
     // when
@@ -78,13 +82,16 @@ public class ActivateJobsTest extends GatewayTest {
           .isEqualTo(stub.getElementInstanceKey());
       JsonUtil.assertEquality(job.getCustomHeaders(), stub.getCustomHeaders());
       JsonUtil.assertEquality(job.getPayload(), stub.getPayload());
-
-      final BrokerActivateJobsRequest brokerRequest = gateway.getSingleBrokerRequest();
-      final JobBatchRecord brokerRequestValue = brokerRequest.getRequestWriter();
-      assertThat(brokerRequestValue.getAmount()).isEqualTo(amount);
-      assertThat(brokerRequestValue.getType()).isEqualTo(wrapString(jobType));
-      assertThat(brokerRequestValue.getTimeout()).isEqualTo(timeout.toMillis());
-      assertThat(brokerRequestValue.getWorker()).isEqualTo(wrapString(worker));
     }
+
+    final BrokerActivateJobsRequest brokerRequest = gateway.getSingleBrokerRequest();
+    final JobBatchRecord brokerRequestValue = brokerRequest.getRequestWriter();
+    assertThat(brokerRequestValue.getAmount()).isEqualTo(amount);
+    assertThat(brokerRequestValue.getType()).isEqualTo(wrapString(jobType));
+    assertThat(brokerRequestValue.getTimeout()).isEqualTo(timeout.toMillis());
+    assertThat(brokerRequestValue.getWorker()).isEqualTo(wrapString(worker));
+    assertThat(brokerRequestValue.variables())
+        .extracting(v -> BufferUtil.bufferAsString(v.getValue()))
+        .containsExactly("var1", "var2", "var3");
   }
 }

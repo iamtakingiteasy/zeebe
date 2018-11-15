@@ -118,6 +118,7 @@ public class ActivateJobsTest extends ClientTest {
     assertThat(request.getAmount()).isEqualTo(3);
     assertThat(request.getTimeout()).isEqualTo(1000);
     assertThat(request.getWorker()).isEqualTo("worker1");
+    assertThat(request.getVariablesList()).isEmpty();
   }
 
   @Test
@@ -164,5 +165,24 @@ public class ActivateJobsTest extends ClientTest {
                 client.jobClient().newActivateJobsCommand().jobType("foo").amount(3).send().join())
         .isInstanceOf(ClientException.class)
         .hasMessageContaining("Invalid request");
+  }
+
+  @Test
+  public void shouldActivateJobsWithVariables() {
+    // when
+    client
+        .jobClient()
+        .newActivateJobsCommand()
+        .jobType("foo")
+        .amount(3)
+        .timeout(1000)
+        .workerName("worker1")
+        .variables("var1", "var2", "var3")
+        .send()
+        .join();
+
+    // then
+    final ActivateJobsRequest request = gatewayService.getLastRequest();
+    assertThat(request.getVariablesList()).containsExactly("var1", "var2", "var3");
   }
 }

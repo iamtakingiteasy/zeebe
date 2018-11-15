@@ -32,6 +32,8 @@ import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsRequest;
 import io.zeebe.gateway.protocol.GatewayOuterClass.ActivateJobsRequest.Builder;
 import io.zeebe.util.CloseableSilently;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -50,6 +52,7 @@ public class JobWorkerBuilderImpl
   private String workerName;
   private int bufferSize;
   private Duration pollInterval;
+  private List<String> variables = Collections.emptyList();
 
   public JobWorkerBuilderImpl(
       ZeebeClientConfiguration configuration,
@@ -112,6 +115,12 @@ public class JobWorkerBuilderImpl
   }
 
   @Override
+  public JobWorkerBuilderStep3 variables(String... variables) {
+    this.variables = Arrays.asList(variables);
+    return this;
+  }
+
+  @Override
   public JobWorker open() {
     ensureNotNullNorEmpty("jobType", jobType);
     ensureNotNull("jobHandler", handler);
@@ -124,7 +133,8 @@ public class JobWorkerBuilderImpl
             .setType(jobType)
             .setTimeout(timeout)
             .setWorker(workerName)
-            .setAmount(bufferSize);
+            .setAmount(bufferSize)
+            .addAllVariables(variables);
 
     final JobRunnableFactory jobRunnableFactory = new JobRunnableFactory(jobClient, handler);
     final JobPoller jobPoller = new JobPoller(gatewayStub, requestBuilder, objectMapper);

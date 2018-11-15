@@ -171,6 +171,7 @@ message ActivateJobsRequest {
   string worker = 2;
   int64 timeout = 3;
   int32 amount = 4;
+  repeated string variables = 5;
 }
 
 message JobHeaders {

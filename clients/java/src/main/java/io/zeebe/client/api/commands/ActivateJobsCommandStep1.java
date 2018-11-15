@@ -16,6 +16,7 @@
 package io.zeebe.client.api.commands;
 
 import io.zeebe.client.api.response.ActivateJobsResponse;
+import io.zeebe.client.api.response.ActivatedJob;
 import java.time.Duration;
 
 public interface ActivateJobsCommandStep1 {
@@ -86,5 +87,15 @@ public interface ActivateJobsCommandStep1 {
      *     it to the broker.
      */
     ActivateJobsCommandStep3 workerName(String workerName);
+
+    /**
+     * Select the workflow variables to fetch along with the job. Fetches all variables if no
+     * variables are selected. The fetched variables can be accessed as a single JSON document via
+     * {@link ActivatedJob#getPayload()}.
+     *
+     * @param variables names of variables to fetch
+     * @return this builder. Call {@link #send()} to complete the command and send it to the broker.
+     */
+    ActivateJobsCommandStep3 variables(String... variables);
   }
 }

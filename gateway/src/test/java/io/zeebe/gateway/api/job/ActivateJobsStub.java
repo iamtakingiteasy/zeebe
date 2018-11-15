@@ -20,6 +20,8 @@ import io.zeebe.gateway.api.util.StubbedGateway.RequestStub;
 import io.zeebe.gateway.impl.broker.request.BrokerActivateJobsRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
 import io.zeebe.gateway.impl.data.MsgPackConverter;
+import io.zeebe.msgpack.value.StringValue;
+import io.zeebe.msgpack.value.ValueArray;
 import io.zeebe.protocol.impl.record.value.job.JobBatchRecord;
 import java.util.stream.LongStream;
 import org.agrona.DirectBuffer;
@@ -102,9 +104,17 @@ public class ActivateJobsStub
     response.setWorker(requestDto.getWorker());
     response.setType(requestDto.getType());
     response.setTimeout(requestDto.getTimeout());
+    addVariables(response, requestDto);
     addJobs(response, requestDto.getAmount(), requestDto.getType(), requestDto.getWorker());
 
     return new BrokerResponse<>(response, 0, JOB_BATCH_KEY);
+  }
+
+  private void addVariables(JobBatchRecord response, JobBatchRecord requestDto) {
+    final ValueArray<StringValue> responseVariables = response.variables();
+    for (StringValue variable : requestDto.variables()) {
+      responseVariables.add().wrap(variable.getValue());
+    }
   }
 
   private void addJobs(

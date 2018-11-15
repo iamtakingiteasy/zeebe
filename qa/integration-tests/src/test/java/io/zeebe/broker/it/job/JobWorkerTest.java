@@ -25,18 +25,24 @@ import io.zeebe.broker.it.GrpcClientRule;
 import io.zeebe.broker.it.util.RecordingJobHandler;
 import io.zeebe.broker.test.EmbeddedBrokerRule;
 import io.zeebe.client.api.clients.JobClient;
+import io.zeebe.client.api.clients.WorkflowClient;
 import io.zeebe.client.api.events.JobEvent;
 import io.zeebe.client.api.response.ActivatedJob;
 import io.zeebe.client.api.subscription.JobWorker;
 import io.zeebe.exporter.record.Record;
 import io.zeebe.exporter.record.value.JobRecordValue;
+import io.zeebe.model.bpmn.Bpmn;
+import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.protocol.intent.JobBatchIntent;
 import io.zeebe.protocol.intent.JobIntent;
+import io.zeebe.test.util.JsonUtil;
 import io.zeebe.test.util.TestUtil;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -56,10 +62,12 @@ public class JobWorkerTest {
   @Rule public Timeout timeout = Timeout.seconds(20);
 
   private JobClient jobClient;
+  private WorkflowClient workflowClient;
 
   @Before
   public void setUp() {
     jobClient = clientRule.getClient().jobClient();
+    workflowClient = clientRule.getClient().workflowClient();
   }
 
   @Test
@@ -445,7 +453,92 @@ public class JobWorkerTest {
     TestUtil.waitUntil(() -> jobHandler.getHandledJobs().size() > subscriptionCapacity);
   }
 
+  @Test
+  public void shouldFetchSelectedVariablesOnActivation() {
+    // given
+    deployOneTaskWorkflow("process", "foo");
+
+    final Map<String, Object> payload = new HashMap<>();
+    payload.put("a", 1);
+    payload.put("b", 2);
+    payload.put("c", Collections.singletonMap("x", 3));
+
+    startWorkflowInstance("process", payload);
+
+    final RecordingJobHandler jobHandler =
+        new RecordingJobHandler((c, t) -> c.newCompleteCommand(t.getKey()).send());
+
+    // when
+    jobClient
+        .newWorker()
+        .jobType("foo")
+        .handler(jobHandler)
+        .timeout(Duration.ofMinutes(5))
+        .name("test")
+        .variables("a", "c")
+        .open();
+
+    // then
+    waitUntil(() -> !jobHandler.getHandledJobs().isEmpty());
+
+    final ActivatedJob job = jobHandler.getHandledJobs().get(0);
+    JsonUtil.assertEquality(job.getPayload(), "{'a': 1, 'c': {'x': 3}}");
+  }
+
+  @Test
+  public void shouldFetchAllVariablesOnActivationByDefault() {
+    // given
+    deployOneTaskWorkflow("process", "foo");
+
+    final Map<String, Object> payload = new HashMap<>();
+    payload.put("a", 1);
+    payload.put("b", 2);
+    payload.put("c", Collections.singletonMap("x", 3));
+
+    startWorkflowInstance("process", payload);
+
+    final RecordingJobHandler jobHandler =
+        new RecordingJobHandler((c, t) -> c.newCompleteCommand(t.getKey()).send());
+
+    // when
+    jobClient
+        .newWorker()
+        .jobType("foo")
+        .handler(jobHandler)
+        .timeout(Duration.ofMinutes(5))
+        .name("test")
+        .open();
+
+    // then
+    waitUntil(() -> !jobHandler.getHandledJobs().isEmpty());
+
+    final ActivatedJob job = jobHandler.getHandledJobs().get(0);
+    JsonUtil.assertEquality(job.getPayload(), "{'a': 1, 'b': 2, 'c': {'x': 3}}");
+  }
+
   private JobEvent createJobOfType(final String type) {
     return jobClient.newCreateCommand().jobType(type).send().join();
+  }
+
+  private void deployOneTaskWorkflow(String processId, String jobType) {
+    final BpmnModelInstance modelInstance =
+        Bpmn.createExecutableProcess(processId)
+            .startEvent()
+            .serviceTask("task", b -> b.zeebeTaskType(jobType))
+            .endEvent()
+            .done();
+
+    final WorkflowClient workflowClient = clientRule.getWorkflowClient();
+    workflowClient.newDeployCommand().addWorkflowModel(modelInstance, "process.bpmn").send().join();
+  }
+
+  private void startWorkflowInstance(String processId, Map<String, Object> payload) {
+    workflowClient
+        .newCreateInstanceCommand()
+        .bpmnProcessId("process")
+        .latestVersion()
+        .payload(payload)
+        .send()
+        .join();
   }
 }

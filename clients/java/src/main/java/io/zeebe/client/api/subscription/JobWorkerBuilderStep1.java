@@ -144,6 +144,8 @@ public interface JobWorkerBuilderStep1 {
      */
     JobWorkerBuilderStep3 pollInterval(Duration pollInterval);
 
+    JobWorkerBuilderStep3 variables(String... variables);
+
     /**
      * Open the worker and start to work on available tasks.
      *
