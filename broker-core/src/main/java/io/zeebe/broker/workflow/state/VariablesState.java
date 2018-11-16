@@ -113,11 +113,15 @@ public class VariablesState {
      * => Optimierungen: Keys in aufsteigender Reihenfolge iterieren; => single-pass merge join
      */
 
+    // TODO: write test that requires that this line is here
+    variablesToSet.clear();
+    final int documentLength = document.capacity();
+
     // ensuring the document is byte[]-backed; => can certainly be optimized
-    documentBuffer.putBytes(0, document, 0, document.capacity());
+    documentBuffer.putBytes(0, document, 0, documentLength);
     // TODO: das ist vll nicht nötig, weil wir die Keys eh nochmal in den state-key-buffer kopieren
 
-    reader.wrap(documentBuffer, 0, documentBuffer.capacity());
+    reader.wrap(documentBuffer, 0, documentLength);
 
     final int variables = reader.readMapHeader();
 
@@ -144,7 +148,7 @@ public class VariablesState {
         reader.wrap(
             documentBuffer,
             keyOffset,
-            documentBuffer.capacity() - keyOffset); // TODO: length calculation is not nice
+            documentLength - keyOffset); // TODO: length calculation is not nice
 
         final int keyLength = reader.readStringLength();
         final int keyStringOffset = keyOffset + reader.getOffset();
@@ -152,7 +156,7 @@ public class VariablesState {
         reader.wrap(
             documentBuffer,
             valueOffset,
-            documentBuffer.capacity() - valueOffset); // TODO: length calculation is not nice
+            documentLength - valueOffset); // TODO: length calculation is not nice
         reader.skipValue();
         final int valueLength = reader.getOffset();
 
@@ -185,7 +189,7 @@ public class VariablesState {
       reader.wrap(
           documentBuffer,
           keyOffset,
-          documentBuffer.capacity() - keyOffset); // TODO: length calculation is not nice
+          documentLength - keyOffset); // TODO: length calculation is not nice
 
       final int keyLength = reader.readStringLength();
       final int keyStringOffset = keyOffset + reader.getOffset();
@@ -193,7 +197,7 @@ public class VariablesState {
       reader.wrap(
           documentBuffer,
           valueOffset,
-          documentBuffer.capacity() - valueOffset); // TODO: length calculation is not nice
+          documentLength - valueOffset); // TODO: length calculation is not nice
       reader.skipValue();
       final int valueLength = reader.getOffset();
 
