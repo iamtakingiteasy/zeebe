@@ -183,7 +183,7 @@ public class WorkflowEngineState implements StreamProcessorLifecycleAware {
     // Hack while we maintain both payload and variable concept in parallel;
     // we reflect any payload update in the in the variables store;
     // we do it regardless if payload has changed (=> easiest for this temporary code)
-    elementInstanceState.getVariablesState().setVariablesLocalFromDocument(key, value.getPayload());
+    elementInstanceState.getVariablesState().setVariablesFromDocument(key, value.getPayload());
   }
 
   private void removeElementInstance(long key, WorkflowInstanceRecord value) {
@@ -200,7 +200,7 @@ public class WorkflowEngineState implements StreamProcessorLifecycleAware {
       // this overwrites the scope instance payload whenever an output mappings is applied
       elementInstanceState
           .getVariablesState()
-          .setVariablesLocalFromDocument(scopeInstanceKey, value.getPayload());
+          .setVariablesFromDocument(scopeInstanceKey, value.getPayload());
     }
   }
 
