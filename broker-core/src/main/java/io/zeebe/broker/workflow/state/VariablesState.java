@@ -32,6 +32,8 @@ import org.agrona.BitUtil;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Int2IntHashMap;
+import org.agrona.collections.Int2IntHashMap.EntryIterator;
 import org.agrona.collections.MutableInteger;
 import org.agrona.collections.ObjectHashSet;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -66,6 +68,11 @@ public class VariablesState {
   private ObjectHashSet<DirectBuffer> collectedVariables = new ObjectHashSet<>();
   private ObjectHashSet<DirectBuffer> variablesToCollect = new ObjectHashSet<>();
 
+  // setting variables
+  // variable name offset -> variable value offset
+  private Int2IntHashMap variablesToSet = new Int2IntHashMap(-1);
+  private final ExpandableArrayBuffer documentBuffer = new ExpandableArrayBuffer();
+
   public VariablesState(
       StateController stateController,
       ColumnFamilyHandle elementChildParentHandle,
@@ -91,6 +98,113 @@ public class VariablesState {
 
       setVariableLocal(
           scopeKey, document, nameOffset, nameLength, document, valueOffset, valueLength);
+    }
+  }
+
+  public void setVariablesFromDocument(long scopeKey, DirectBuffer document) {
+    /*
+     * 1. Namen der Variablen, die man setzen will, in ein Set tun (bzw. HashMap,
+     *   die die offsets der jeweiligen Values enthält)
+     * 2. Scopes von unten nach oben iterieren bis das Set leer ist
+     * 3. Pro Scope: Alle zu setzenden Variablen iterieren; falls vorhanden, dann überschreiben
+     * 4. Alle am Ende übrigen Variablen werden auf dem Topscope gesetzt
+     *
+     * => hier sind Optimierungen mit Hashes/Bloomfiltern möglich ?!
+     * => Optimierungen: Keys in aufsteigender Reihenfolge iterieren; => single-pass merge join
+     */
+
+    // ensuring the document is byte[]-backed; => can certainly be optimized
+    documentBuffer.putBytes(0, document, 0, document.capacity());
+    // TODO: das ist vll nicht nötig, weil wir die Keys eh nochmal in den state-key-buffer kopieren
+
+    reader.wrap(documentBuffer, 0, documentBuffer.capacity());
+
+    final int variables = reader.readMapHeader();
+
+    for (int i = 0; i < variables; i++) {
+      final int keyOffset = reader.getOffset();
+      reader.skipValue();
+      final int valueOffset = reader.getOffset();
+      reader.skipValue();
+
+      variablesToSet.put(keyOffset, valueOffset);
+    }
+
+    long currentScope = scopeKey;
+    long parentScope;
+
+    while (!variablesToSet.isEmpty() && (parentScope = getParent(currentScope)) > 0) {
+      final EntryIterator iterator = variablesToSet.entrySet().iterator();
+
+      while (iterator.hasNext()) {
+        iterator.next();
+        final int keyOffset = iterator.getIntKey();
+        final int valueOffset = iterator.getIntValue();
+
+        reader.wrap(
+            documentBuffer,
+            keyOffset,
+            documentBuffer.capacity() - keyOffset); // TODO: length calculation is not nice
+
+        final int keyLength = reader.readStringLength();
+        final int keyStringOffset = keyOffset + reader.getOffset();
+
+        reader.wrap(
+            documentBuffer,
+            valueOffset,
+            documentBuffer.capacity() - valueOffset); // TODO: length calculation is not nice
+        reader.skipValue();
+        final int valueLength = reader.getOffset();
+
+        final boolean variableSet =
+            setVariableLocalIfExists(
+                currentScope,
+                documentBuffer,
+                keyStringOffset,
+                keyLength,
+                documentBuffer,
+                valueOffset,
+                valueLength);
+
+        if (variableSet) {
+          iterator.remove();
+        }
+
+        currentScope = parentScope;
+      }
+      currentScope = parentScope;
+    }
+
+    // TODO: avoid duplicated code with loop above
+    final EntryIterator iterator = variablesToSet.entrySet().iterator();
+    while (iterator.hasNext()) {
+      iterator.next();
+      final int keyOffset = iterator.getIntKey();
+      final int valueOffset = iterator.getIntValue();
+
+      reader.wrap(
+          documentBuffer,
+          keyOffset,
+          documentBuffer.capacity() - keyOffset); // TODO: length calculation is not nice
+
+      final int keyLength = reader.readStringLength();
+      final int keyStringOffset = keyOffset + reader.getOffset();
+
+      reader.wrap(
+          documentBuffer,
+          valueOffset,
+          documentBuffer.capacity() - valueOffset); // TODO: length calculation is not nice
+      reader.skipValue();
+      final int valueLength = reader.getOffset();
+
+      setVariableLocal(
+          currentScope,
+          documentBuffer,
+          keyStringOffset,
+          keyLength,
+          documentBuffer,
+          valueOffset,
+          valueLength);
     }
   }
 
@@ -122,6 +236,39 @@ public class VariablesState {
         stateValueBuffer.byteArray(),
         0,
         valueLength);
+  }
+
+  /** @return true if the variable was set */
+  private boolean setVariableLocalIfExists(
+      long scopeKey,
+      DirectBuffer name,
+      int nameOffset,
+      int nameLength,
+      DirectBuffer value,
+      int valueOffset,
+      int valueLength) {
+    stateKeyBuffer.putLong(
+        VARIABLES_SCOPE_KEY_OFFSET, scopeKey, ZeebeStateConstants.STATE_BYTE_ORDER);
+    stateKeyBuffer.putBytes(VARIABLES_NAME_OFFSET, name, nameOffset, nameLength);
+
+    final int keyLength = VARIABLES_NAME_OFFSET + nameLength;
+
+    if (stateController.exist(variablesHandle, stateKeyBuffer.byteArray(), 0, keyLength)) {
+      stateValueBuffer.putBytes(0, value, valueOffset, valueLength);
+
+      stateController.put(
+          variablesHandle,
+          stateKeyBuffer.byteArray(),
+          0,
+          keyLength,
+          stateValueBuffer.byteArray(),
+          0,
+          valueLength);
+
+      return true;
+    } else {
+      return false;
+    }
   }
 
   public DirectBuffer getVariableLocal(long scopeKey, DirectBuffer name) {
