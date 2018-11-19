@@ -58,6 +58,14 @@ public final class JobCompletedEventProcessor implements TypedRecordProcessor<Jo
       elementInstance.setState(WorkflowInstanceIntent.ELEMENT_COMPLETING);
       elementInstance.setJobKey(-1);
       elementInstance.setValue(value);
+
+      // TODO: wow, method chains
+      workflowState
+          .getElementInstanceState()
+          .getVariablesState()
+          .setVariablesFromDocument(elementInstanceKey, jobEvent.getPayload());
+
+      workflowState.getElementInstanceState().flushDirtyState();
     }
   }
 }

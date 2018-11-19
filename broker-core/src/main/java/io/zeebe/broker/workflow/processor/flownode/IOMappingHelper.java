@@ -26,14 +26,16 @@ import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceReco
 import org.agrona.DirectBuffer;
 
 public class IOMappingHelper {
-  public <T extends ExecutableFlowNode> void applyOutputMappings(BpmnStepContext<T> context) {
+
+  public <T extends ExecutableFlowNode> DirectBuffer applyOutputMappings(
+      BpmnStepContext<T> context) {
     final T element = context.getElement();
     final MsgPackMergeTool mergeTool = context.getMergeTool();
     final WorkflowInstanceRecord record = context.getValue();
     final WorkflowInstanceRecord scope = context.getFlowScopeInstance().getValue();
     final ZeebeOutputBehavior outputBehavior = element.getOutputBehavior();
 
-    DirectBuffer payload = scope.getPayload();
+    final DirectBuffer payload = scope.getPayload();
     mergeTool.reset();
 
     if (outputBehavior != ZeebeOutputBehavior.none) {
@@ -42,14 +44,14 @@ public class IOMappingHelper {
       }
 
       mergeTool.mergeDocumentStrictly(record.getPayload(), element.getOutputMappings());
-      payload = mergeTool.writeResultToBuffer();
-      scope.setPayload(payload);
+      return mergeTool.writeResultToBuffer();
+    } else {
+      return payload;
     }
-
-    record.setPayload(payload);
   }
 
-  public <T extends ExecutableFlowNode> void applyInputMappings(BpmnStepContext<T> context) {
+  public <T extends ExecutableFlowNode> DirectBuffer applyInputMappings(
+      BpmnStepContext<T> context) {
     final WorkflowInstanceRecord record = context.getValue();
     final MsgPackMergeTool mergeTool = context.getMergeTool();
     final T element = context.getElement();
@@ -58,7 +60,9 @@ public class IOMappingHelper {
     if (mappings.length > 0) {
       mergeTool.reset();
       mergeTool.mergeDocumentStrictly(record.getPayload(), element.getInputMappings());
-      record.setPayload(mergeTool.writeResultToBuffer());
+      return mergeTool.writeResultToBuffer();
+    } else {
+      return record.getPayload();
     }
   }
 }

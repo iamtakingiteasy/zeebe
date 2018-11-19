@@ -57,12 +57,13 @@ public class BpmnStepHandlers {
   public BpmnStepHandlers(WorkflowState workflowState, ZeebeState zeebeState) {
     final JobState jobState = zeebeState.getJobState();
     // activity
-    stepHandlers.put(BpmnStep.ACTIVATE_ACTIVITY, new ActivateActivityHandler());
-    stepHandlers.put(BpmnStep.COMPLETE_ACTIVITY, new CompleteActivityHandler());
+    stepHandlers.put(BpmnStep.ACTIVATE_ACTIVITY, new ActivateActivityHandler(workflowState));
+    stepHandlers.put(BpmnStep.COMPLETE_ACTIVITY, new CompleteActivityHandler(workflowState));
     stepHandlers.put(BpmnStep.TERMINATE_ACTIVITY, new TerminateActivityHandler());
 
     // boundary events
-    stepHandlers.put(BpmnStep.TRIGGER_BOUNDARY_EVENT, new TriggerBoundaryEventHandler());
+    stepHandlers.put(
+        BpmnStep.TRIGGER_BOUNDARY_EVENT, new TriggerBoundaryEventHandler(workflowState));
 
     // service task
     stepHandlers.put(BpmnStep.CREATE_JOB, new CreateJobHandler());
@@ -73,8 +74,8 @@ public class BpmnStepHandlers {
     // flow nodes
     stepHandlers.put(BpmnStep.CONSUME_TOKEN, new ConsumeTokenHandler());
     stepHandlers.put(BpmnStep.START_FLOW_NODE, new StartFlowNodeHandler());
-    stepHandlers.put(BpmnStep.ACTIVATE_FLOW_NODE, new ActivateFlowNodeHandler());
-    stepHandlers.put(BpmnStep.COMPLETE_FLOW_NODE, new CompleteFlowNodeHandler());
+    stepHandlers.put(BpmnStep.ACTIVATE_FLOW_NODE, new ActivateFlowNodeHandler(workflowState));
+    stepHandlers.put(BpmnStep.COMPLETE_FLOW_NODE, new CompleteFlowNodeHandler(workflowState));
     stepHandlers.put(BpmnStep.TERMINATE_ELEMENT, new TerminateFlowNodeHandler());
 
     // sequence flow

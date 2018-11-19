@@ -22,23 +22,38 @@ import io.zeebe.broker.workflow.model.element.ExecutableBoundaryEvent;
 import io.zeebe.broker.workflow.processor.BpmnStepContext;
 import io.zeebe.broker.workflow.processor.BpmnStepHandler;
 import io.zeebe.broker.workflow.processor.flownode.IOMappingHelper;
+import io.zeebe.broker.workflow.state.WorkflowState;
 import io.zeebe.msgpack.mapping.MappingException;
 import io.zeebe.protocol.intent.WorkflowInstanceIntent;
+import org.agrona.DirectBuffer;
 
 public class TriggerBoundaryEventHandler implements BpmnStepHandler<ExecutableBoundaryEvent> {
+
   private final IOMappingHelper ioMappingHelper = new IOMappingHelper();
+  private final WorkflowState state;
+
+  public TriggerBoundaryEventHandler(WorkflowState state) {
+    this.state = state;
+  }
 
   @Override
   public void handle(BpmnStepContext<ExecutableBoundaryEvent> context) {
     try {
-      ioMappingHelper.applyOutputMappings(context);
+      final long key = context.getRecord().getKey();
+
+      final DirectBuffer mappedPayload = ioMappingHelper.applyOutputMappings(context);
+      context.getValue().setPayload(mappedPayload);
+
+      // TODO: nice, method chaining
+      state
+          .getElementInstanceState()
+          .getVariablesState()
+          .setVariablesFromDocument(key, mappedPayload);
 
       context
           .getOutput()
           .appendFollowUpEvent(
-              context.getRecord().getKey(),
-              WorkflowInstanceIntent.CATCH_EVENT_TRIGGERED,
-              context.getValue());
+              key, WorkflowInstanceIntent.CATCH_EVENT_TRIGGERED, context.getValue());
     } catch (MappingException e) {
       context.raiseIncident(ErrorType.IO_MAPPING_ERROR, e.getMessage());
     }

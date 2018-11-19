@@ -139,6 +139,8 @@ public final class CorrelateWorkflowInstanceSubscription
 
     eventInstance.setState(WorkflowInstanceIntent.ELEMENT_COMPLETING);
     eventInstance.setValue(value);
+
+    workflowState.getElementInstanceState().flushDirtyState();
   }
 
   private boolean sendAcknowledgeCommand() {

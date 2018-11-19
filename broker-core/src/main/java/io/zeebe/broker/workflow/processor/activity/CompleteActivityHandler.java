@@ -20,8 +20,14 @@ package io.zeebe.broker.workflow.processor.activity;
 import io.zeebe.broker.workflow.model.element.ExecutableActivity;
 import io.zeebe.broker.workflow.processor.BpmnStepContext;
 import io.zeebe.broker.workflow.processor.flownode.CompleteFlowNodeHandler;
+import io.zeebe.broker.workflow.state.WorkflowState;
 
 public class CompleteActivityHandler extends CompleteFlowNodeHandler<ExecutableActivity> {
+
+  public CompleteActivityHandler(WorkflowState state) {
+    super(state);
+  }
+
   @Override
   public void complete(BpmnStepContext<? extends ExecutableActivity> context) {
     super.complete(context);
