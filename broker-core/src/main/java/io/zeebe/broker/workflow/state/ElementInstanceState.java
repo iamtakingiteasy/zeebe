@@ -327,6 +327,29 @@ public class ElementInstanceState {
     return records;
   }
 
+  @FunctionalInterface
+  public interface TokenVisitor {
+    void visitToken(IndexedRecord indexedRecord);
+  }
+
+  public void visitFailedTokens(long scopeKey, TokenVisitor visitor) {
+    visitTokens(scopeKey, Purpose.FAILED_TOKEN, visitor);
+  }
+
+  private void visitTokens(long scopeKey, Purpose purpose, TokenVisitor visitor) {
+    longKeyPurposeBuffer.putLong(0, scopeKey, STATE_BYTE_ORDER);
+    longKeyPurposeBuffer.putByte(Long.BYTES, (byte) purpose.ordinal());
+
+    rocksDbWrapper.whileEqualPrefix(
+        tokenParentChildHandle,
+        longKeyPurposeBuffer.byteArray(),
+        (key, value) -> {
+          final StoredRecord tokenEvent =
+              getTokenEvent(getLong(key, Long.BYTES + BitUtil.SIZE_OF_BYTE));
+          visitor.visitToken(tokenEvent.getRecord());
+        });
+  }
+
   private static long getLong(byte[] array, int offset) {
     return new UnsafeBuffer(array, offset, Long.BYTES).getLong(0, STATE_BYTE_ORDER);
   }

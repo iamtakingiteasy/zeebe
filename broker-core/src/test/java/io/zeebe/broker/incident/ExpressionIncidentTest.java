@@ -351,4 +351,38 @@ public class ExpressionIncidentTest {
     testClient.receiveFirstIncidentEvent(IncidentIntent.RESOLVED);
     testClient.receiveElementInState("workflow", ELEMENT_COMPLETED);
   }
+
+  @Test
+  public void shouldResolveIncidentIfInstanceCanceled() {
+    // given
+    testClient.deploy(
+        Bpmn.createExecutableProcess("workflow")
+            .startEvent()
+            .exclusiveGateway("xor")
+            .sequenceFlowId("s1")
+            .condition("$.foo < 5")
+            .endEvent()
+            .moveToLastGateway()
+            .sequenceFlowId("s2")
+            .condition("$.foo >= 5 && $.foo < 10")
+            .endEvent()
+            .done());
+
+    final long workflowInstance =
+        testClient.createWorkflowInstance("workflow", asMsgPack("foo", "bar"));
+
+    // when
+    testClient.receiveFirstIncidentEvent(IncidentIntent.CREATED);
+    testClient.cancelWorkflowInstance(workflowInstance);
+
+    // then incident is resolved
+    final Record incidentEvent = testClient.receiveFirstIncidentEvent(IncidentIntent.RESOLVED);
+
+    assertThat(incidentEvent.getKey()).isGreaterThan(0);
+    assertIncidentRecordValue(
+        ErrorType.CONDITION_ERROR.name(),
+        "Cannot compare values of different types: STRING and INTEGER",
+        "xor",
+        incidentEvent);
+  }
 }
