@@ -43,8 +43,6 @@ import io.zeebe.protocol.intent.WorkflowInstanceSubscriptionIntent;
 import io.zeebe.test.broker.protocol.clientapi.ClientApiRule;
 import io.zeebe.test.broker.protocol.clientapi.PartitionTestClient;
 import io.zeebe.test.util.record.RecordingExporter;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.agrona.DirectBuffer;
@@ -84,59 +82,20 @@ public class MessageCatchElementTest {
           .endEvent()
           .done();
 
-  private static final BpmnModelInstance BOUNDARY_EVENT_WORKFLOW =
-      Bpmn.createExecutableProcess(PROCESS_ID)
-          .startEvent()
-          .serviceTask("receive-message", b -> b.zeebeTaskType("type"))
-          .boundaryEvent()
-          .message(b -> b.name("order canceled").zeebeCorrelationKey("$.orderId"))
-          .sequenceFlowId("to-end")
-          .endEvent()
-          .moveToActivity("receive-message")
-          .endEvent()
-          .done();
-
   @Parameter(0)
   public String elementType;
 
   @Parameter(1)
   public BpmnModelInstance workflow;
 
-  @Parameter(2)
-  public WorkflowInstanceIntent leftState;
-
-  @Parameter(3)
-  public WorkflowInstanceIntent[] additionalLifecycleStates;
-
   @Parameters(name = "{0}")
   public static final Object[][] parameters() {
     return new Object[][] {
       {
-        "intermediate message catch event",
-        CATCH_EVENT_WORKFLOW,
-        WorkflowInstanceIntent.ELEMENT_COMPLETED,
-        new WorkflowInstanceIntent[] {
-          WorkflowInstanceIntent.ELEMENT_COMPLETING, WorkflowInstanceIntent.ELEMENT_COMPLETED
-        },
+        "intermediate message catch event", CATCH_EVENT_WORKFLOW,
       },
       {
-        "receive task",
-        RECEIVE_TASK_WORKFLOW,
-        WorkflowInstanceIntent.ELEMENT_COMPLETED,
-        new WorkflowInstanceIntent[] {
-          WorkflowInstanceIntent.ELEMENT_COMPLETING, WorkflowInstanceIntent.ELEMENT_COMPLETED
-        },
-      },
-      {
-        "boundary event",
-        BOUNDARY_EVENT_WORKFLOW,
-        WorkflowInstanceIntent.ELEMENT_TERMINATED,
-        new WorkflowInstanceIntent[] {
-          WorkflowInstanceIntent.ELEMENT_TERMINATING,
-          WorkflowInstanceIntent.CATCH_EVENT_TRIGGERING,
-          WorkflowInstanceIntent.ELEMENT_TERMINATED,
-          WorkflowInstanceIntent.CATCH_EVENT_TRIGGERED,
-        },
+        "receive task", RECEIVE_TASK_WORKFLOW,
       },
     };
   }
@@ -158,26 +117,24 @@ public class MessageCatchElementTest {
   public void testWorkflowInstanceLifeCycle() {
     testClient.publishMessage("order canceled", "order-123");
     testClient.createWorkflowInstance(PROCESS_ID, asMsgPack("orderId", "order-123"));
-    final List<WorkflowInstanceIntent> lifecycle = new ArrayList<>();
-    lifecycle.addAll(
-        Arrays.asList(
+
+    final List<Record<WorkflowInstanceRecordValue>> events =
+        testClient.receiveWorkflowInstances().limit(10).collect(Collectors.toList());
+
+    assertThat(events)
+        .extracting(Record::getMetadata)
+        .extracting(RecordMetadata::getIntent)
+        .containsExactly(
             WorkflowInstanceIntent.CREATE,
             WorkflowInstanceIntent.ELEMENT_READY,
             WorkflowInstanceIntent.ELEMENT_ACTIVATED,
             WorkflowInstanceIntent.START_EVENT_OCCURRED,
             WorkflowInstanceIntent.SEQUENCE_FLOW_TAKEN,
             WorkflowInstanceIntent.ELEMENT_READY,
-            WorkflowInstanceIntent.ELEMENT_ACTIVATED));
-    lifecycle.addAll(Arrays.asList(this.additionalLifecycleStates));
-    lifecycle.add(WorkflowInstanceIntent.SEQUENCE_FLOW_TAKEN);
-
-    final List<Record<WorkflowInstanceRecordValue>> events =
-        testClient.receiveWorkflowInstances().limit(lifecycle.size()).collect(Collectors.toList());
-
-    assertThat(events)
-        .extracting(Record::getMetadata)
-        .extracting(RecordMetadata::getIntent)
-        .containsExactlyElementsOf(lifecycle);
+            WorkflowInstanceIntent.ELEMENT_ACTIVATED,
+            WorkflowInstanceIntent.ELEMENT_COMPLETING,
+            WorkflowInstanceIntent.ELEMENT_COMPLETED,
+            WorkflowInstanceIntent.SEQUENCE_FLOW_TAKEN);
   }
 
   @Test
@@ -351,7 +308,7 @@ public class MessageCatchElementTest {
 
     // then
     assertThat(
-            RecordingExporter.workflowInstanceRecords(leftState)
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.ELEMENT_COMPLETED)
                 .withElementId("receive-message")
                 .exists())
         .isTrue();
