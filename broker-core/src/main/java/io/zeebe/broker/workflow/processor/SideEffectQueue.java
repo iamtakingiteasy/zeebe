@@ -18,13 +18,13 @@
 package io.zeebe.broker.workflow.processor;
 
 import io.zeebe.broker.logstreams.processor.SideEffectProducer;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
 
 public class SideEffectQueue implements SideEffectProducer, Consumer<SideEffectProducer> {
-  private List<SideEffectProducer> sideEffects = new LinkedList<>();
+  private final List<SideEffectProducer> sideEffects = new ArrayList<>();
 
   public void clear() {
     sideEffects.clear();
