@@ -208,9 +208,8 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
 
           boolean visited = false;
           if (sentTime < deadline) {
-            final DirectBuffer subscriptionKeyBuffer =
-                new UnsafeBuffer(keyBuffer, Long.BYTES, keyBuffer.capacity() - Long.BYTES);
-            wrapSubscriptionKey(subscriptionKeyBuffer, subscription);
+            bufferView.wrap(keyBuffer, Long.BYTES, keyBuffer.capacity() - Long.BYTES);
+            wrapSubscriptionKey(bufferView, subscription);
 
             final boolean found =
                 readSubscription(
@@ -280,9 +279,9 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
     subscription.setElementInstanceKey(elementInstanceKey);
     subscription.setMessageName(messageName);
     final int keyLength = writeSubscriptionKey(keyBuffer, 0, subscription);
-    final DirectBuffer key = new UnsafeBuffer(keyBuffer, 0, keyLength);
+    bufferView.wrap(keyBuffer, 0, keyLength);
 
-    return db.exists(subscriptionColumnFamily, key);
+    return db.exists(subscriptionColumnFamily, bufferView);
   }
 
   public boolean remove(long elementInstanceKey, DirectBuffer messageName) {
