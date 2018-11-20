@@ -81,7 +81,7 @@ public class TerminateContainedElementsHandler
     }
   }
 
-  public void resolveExistingIncident(long workflowIncidentKey, IncidentRecord incidentRecord) {
+  private void resolveExistingIncident(IncidentRecord incidentRecord, long workflowIncidentKey) {
     context.getOutput().appendResolvedIncidentEvent(workflowIncidentKey, incidentRecord);
   }
 }

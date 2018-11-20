@@ -279,7 +279,7 @@ public class ElementInstanceState {
   }
 
   public List<IndexedRecord> getDeferredTokens(long scopeKey) {
-    return getTokenEvents(scopeKey, Purpose.DEFERRED_TOKEN);
+    return collectTokenEvents(scopeKey, Purpose.DEFERRED_TOKEN);
   }
 
   public IndexedRecord getFailedToken(long key) {
@@ -308,22 +308,12 @@ public class ElementInstanceState {
   }
 
   public List<IndexedRecord> getFinishedTokens(long scopeKey) {
-    return getTokenEvents(scopeKey, Purpose.FINISHED_TOKEN);
+    return collectTokenEvents(scopeKey, Purpose.FINISHED_TOKEN);
   }
 
-  private List<IndexedRecord> getTokenEvents(long scopeKey, Purpose purpose) {
-    longKeyPurposeBuffer.putLong(0, scopeKey, STATE_BYTE_ORDER);
-    longKeyPurposeBuffer.putByte(Long.BYTES, (byte) purpose.ordinal());
-
+  private List<IndexedRecord> collectTokenEvents(long scopeKey, Purpose purpose) {
     final List<IndexedRecord> records = new ArrayList<>();
-    rocksDbWrapper.whileEqualPrefix(
-        tokenParentChildHandle,
-        longKeyPurposeBuffer.byteArray(),
-        (key, value) -> {
-          final StoredRecord tokenEvent =
-              getTokenEvent(getLong(key, Long.BYTES + BitUtil.SIZE_OF_BYTE));
-          records.add(tokenEvent.getRecord());
-        });
+    visitTokens(scopeKey, purpose, records::add);
     return records;
   }
 
@@ -346,7 +336,9 @@ public class ElementInstanceState {
         (key, value) -> {
           final StoredRecord tokenEvent =
               getTokenEvent(getLong(key, Long.BYTES + BitUtil.SIZE_OF_BYTE));
-          visitor.visitToken(tokenEvent.getRecord());
+          if (tokenEvent != null) {
+            visitor.visitToken(tokenEvent.getRecord());
+          }
         });
   }
 

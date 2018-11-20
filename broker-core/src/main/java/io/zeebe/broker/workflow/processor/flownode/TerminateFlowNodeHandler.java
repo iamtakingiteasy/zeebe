@@ -65,7 +65,7 @@ public class TerminateFlowNodeHandler<T extends ExecutableFlowElement>
    */
   protected void terminate(BpmnStepContext<T> context) {}
 
-  public void resolveExistingIncident(long incidentKey, IncidentRecord incidentRecord) {
+  private void resolveExistingIncident(IncidentRecord incidentRecord, long incidentKey) {
     context.getOutput().appendResolvedIncidentEvent(incidentKey, incidentRecord);
   }
 }

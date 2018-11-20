@@ -71,11 +71,7 @@ public class ExpressionIncidentTest {
   public void init() {
     testClient = apiRule.partitionClient();
     apiRule.waitForPartition(1);
-  }
 
-  @Test
-  public void shouldCreateIncidentIfExclusiveGatewayHasNoMatchingCondition() {
-    // given
     testClient.deploy(
         Bpmn.createExecutableProcess("workflow")
             .startEvent()
@@ -88,6 +84,11 @@ public class ExpressionIncidentTest {
             .condition("$.foo >= 5 && $.foo < 10")
             .endEvent()
             .done());
+  }
+
+  @Test
+  public void shouldCreateIncidentIfExclusiveGatewayHasNoMatchingCondition() {
+    // given
 
     // when
     testClient.createWorkflowInstance("workflow", asMsgPack("foo", 12));
@@ -111,18 +112,6 @@ public class ExpressionIncidentTest {
   @Test
   public void shouldCreateIncidentIfConditionFailsToEvaluate() {
     // given
-    testClient.deploy(
-        Bpmn.createExecutableProcess("workflow")
-            .startEvent()
-            .exclusiveGateway("xor")
-            .sequenceFlowId("s1")
-            .condition("$.foo < 5")
-            .endEvent()
-            .moveToLastGateway()
-            .sequenceFlowId("s2")
-            .condition("$.foo >= 5 && $.foo < 10")
-            .endEvent()
-            .done());
 
     // when
     testClient.createWorkflowInstance("workflow", asMsgPack("foo", "bar"));
@@ -141,18 +130,6 @@ public class ExpressionIncidentTest {
   @Test
   public void shouldResolveIncidentForFailedCondition() {
     // given
-    testClient.deploy(
-        Bpmn.createExecutableProcess("workflow")
-            .startEvent()
-            .exclusiveGateway("xor")
-            .sequenceFlowId("s1")
-            .condition("$.foo < 5")
-            .endEvent()
-            .moveToLastGateway()
-            .sequenceFlowId("s2")
-            .condition("$.foo >= 5 && $.foo < 10")
-            .endEvent()
-            .done());
 
     // when
     testClient.createWorkflowInstance("workflow", asMsgPack("foo", "bar"));
@@ -215,18 +192,6 @@ public class ExpressionIncidentTest {
   @Test
   public void shouldResolveIncidentForFailedConditionAfterUploadingWrongPayload() {
     // given
-    testClient.deploy(
-        Bpmn.createExecutableProcess("workflow")
-            .startEvent()
-            .exclusiveGateway("xor")
-            .sequenceFlowId("s1")
-            .condition("$.foo < 5")
-            .endEvent()
-            .moveToLastGateway()
-            .sequenceFlowId("s2")
-            .condition("$.foo >= 5 && $.foo < 10")
-            .endEvent()
-            .done());
 
     // when
     testClient.createWorkflowInstance("workflow", asMsgPack("foo", "bar"));
@@ -322,18 +287,6 @@ public class ExpressionIncidentTest {
   @Test
   public void shouldResolveIncidentForExclusiveGatewayWithoutMatchingCondition() {
     // given
-    testClient.deploy(
-        Bpmn.createExecutableProcess("workflow")
-            .startEvent()
-            .exclusiveGateway("xor")
-            .sequenceFlowId("s1")
-            .condition("$.foo < 5")
-            .endEvent()
-            .moveToLastGateway()
-            .sequenceFlowId("s2")
-            .condition("$.foo >= 5 && $.foo < 10")
-            .endEvent()
-            .done());
 
     // when
     testClient.createWorkflowInstance("workflow", asMsgPack("foo", 12));
@@ -355,18 +308,6 @@ public class ExpressionIncidentTest {
   @Test
   public void shouldResolveIncidentIfInstanceCanceled() {
     // given
-    testClient.deploy(
-        Bpmn.createExecutableProcess("workflow")
-            .startEvent()
-            .exclusiveGateway("xor")
-            .sequenceFlowId("s1")
-            .condition("$.foo < 5")
-            .endEvent()
-            .moveToLastGateway()
-            .sequenceFlowId("s2")
-            .condition("$.foo >= 5 && $.foo < 10")
-            .endEvent()
-            .done());
 
     final long workflowInstance =
         testClient.createWorkflowInstance("workflow", asMsgPack("foo", "bar"));
