@@ -21,6 +21,7 @@ import static io.zeebe.broker.workflow.WorkflowAssert.assertWorkflowInstancePayl
 import static io.zeebe.broker.workflow.WorkflowAssert.assertWorkflowInstanceRecord;
 import static io.zeebe.test.util.MsgPackUtil.asMsgPack;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
 
 import io.zeebe.broker.test.EmbeddedBrokerRule;
@@ -60,6 +61,19 @@ public class MessageCorrelationTest {
           .message(m -> m.name("ping").zeebeCorrelationKey("$.key"))
           .intermediateCatchEvent("message2")
           .message(m -> m.name("ping").zeebeCorrelationKey("$.key"))
+          .done();
+
+  private static final BpmnModelInstance BOUNDARY_EVENTS_WORKFLOW =
+      Bpmn.createExecutableProcess(PROCESS_ID)
+          .startEvent()
+          .serviceTask("task", b -> b.zeebeTaskType("type"))
+          .boundaryEvent("msg1")
+          .message(m -> m.name("msg1").zeebeCorrelationKey("$.key"))
+          .endEvent("msg1End")
+          .moveToActivity("task")
+          .boundaryEvent("msg2")
+          .message(m -> m.name("msg2").zeebeCorrelationKey("$.key"))
+          .endEvent("msg2End")
           .done();
 
   public EmbeddedBrokerRule brokerRule = new EmbeddedBrokerRule();
@@ -346,5 +360,33 @@ public class MessageCorrelationTest {
         .extracting(
             r -> tuple(r.getValue().getElementId(), r.getValue().getPayloadAsMap().get("nr")))
         .contains(tuple("message1", 1), tuple("message2", 2));
+  }
+
+  @Test
+  public void shouldCorrelateCorrectBoundaryEvent() {
+    // given
+    testClient.deploy(BOUNDARY_EVENTS_WORKFLOW);
+    testClient.createWorkflowInstance(PROCESS_ID, asMsgPack("key", "123"));
+
+    // when
+    testClient
+        .receiveWorkflowInstanceSubscriptions()
+        .withIntent(WorkflowInstanceSubscriptionIntent.OPENED)
+        .limit(2)
+        .asList(); // await both subscriptions opened
+
+    testClient.publishMessage("msg1", "123", asMsgPack("foo", 1));
+
+    // then
+    final List<Record<WorkflowInstanceRecordValue>> records =
+        RecordingExporter.workflowInstanceRecords()
+            .limitToWorkflowInstanceCompleted()
+            .withIntent(WorkflowInstanceIntent.END_EVENT_OCCURRED)
+            .asList();
+
+    assertThat(records).hasSize(1);
+    assertThat(records.get(0).getValue().getElementId()).isEqualTo("msg1End");
+    assertThat(records.get(0).getValue().getPayloadAsMap())
+        .containsExactly(entry("key", "123"), entry("foo", 1));
   }
 }
