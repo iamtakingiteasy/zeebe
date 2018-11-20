@@ -21,6 +21,8 @@ import io.zeebe.broker.logstreams.processor.TypedRecord;
 import io.zeebe.broker.logstreams.processor.TypedRecordProcessor;
 import io.zeebe.broker.logstreams.processor.TypedResponseWriter;
 import io.zeebe.broker.logstreams.processor.TypedStreamWriter;
+import io.zeebe.broker.workflow.model.element.ExecutableServiceTask;
+import io.zeebe.broker.workflow.state.DeployedWorkflow;
 import io.zeebe.broker.workflow.state.ElementInstance;
 import io.zeebe.broker.workflow.state.WorkflowState;
 import io.zeebe.protocol.impl.record.value.job.JobHeaders;
@@ -59,11 +61,22 @@ public final class JobCompletedEventProcessor implements TypedRecordProcessor<Jo
       elementInstance.setJobKey(-1);
       elementInstance.setValue(value);
 
-      // TODO: wow, method chains
-      workflowState
-          .getElementInstanceState()
-          .getVariablesState()
-          .setVariablesFromDocument(elementInstanceKey, jobEvent.getPayload());
+      final DeployedWorkflow workflow = workflowState.getWorkflowByKey(value.getWorkflowKey());
+      final ExecutableServiceTask task =
+          (ExecutableServiceTask) workflow.getWorkflow().getElementById(value.getElementId());
+
+      if (task.hasOutputMappings()) {
+        workflowState
+            .getElementInstanceState()
+            .getVariablesState()
+            .setVariablesLocalFromDocument(elementInstanceKey, jobEvent.getPayload());
+      } else {
+        // TODO: wow, method chains
+        workflowState
+            .getElementInstanceState()
+            .getVariablesState()
+            .setVariablesFromDocument(elementInstanceKey, jobEvent.getPayload());
+      }
 
       workflowState.getElementInstanceState().flushDirtyState();
     }

@@ -24,7 +24,6 @@ import io.zeebe.broker.workflow.processor.BpmnStepHandler;
 import io.zeebe.broker.workflow.state.WorkflowState;
 import io.zeebe.msgpack.mapping.MappingException;
 import io.zeebe.protocol.intent.WorkflowInstanceIntent;
-import org.agrona.DirectBuffer;
 
 public class ActivateFlowNodeHandler<T extends ExecutableFlowNode> implements BpmnStepHandler<T> {
 
@@ -38,14 +37,7 @@ public class ActivateFlowNodeHandler<T extends ExecutableFlowNode> implements Bp
   @Override
   public void handle(BpmnStepContext<T> context) {
     try {
-      final DirectBuffer mappedPayload = ioMappingHelper.applyInputMappings(context);
-      context.getValue().setPayload(mappedPayload);
-
-      // TODO: wow, method chains
-      state
-          .getElementInstanceState()
-          .getVariablesState()
-          .setVariablesFromDocument(context.getRecord().getKey(), mappedPayload);
+      ioMappingHelper.applyInputMappings(state, context);
 
       activate(context);
 

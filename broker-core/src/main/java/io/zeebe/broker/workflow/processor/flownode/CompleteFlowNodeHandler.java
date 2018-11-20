@@ -45,7 +45,7 @@ public class CompleteFlowNodeHandler<T extends ExecutableFlowNode> implements Bp
       state
           .getElementInstanceState()
           .getVariablesState()
-          .setVariablesFromDocument(context.getRecord().getKey(), mappedPayload);
+          .setVariablesFromDocument(context.getValue().getScopeInstanceKey(), mappedPayload);
 
       complete(context);
 

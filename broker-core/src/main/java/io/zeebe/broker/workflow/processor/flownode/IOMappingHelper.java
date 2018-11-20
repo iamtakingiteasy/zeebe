@@ -19,6 +19,7 @@ package io.zeebe.broker.workflow.processor.flownode;
 
 import io.zeebe.broker.workflow.model.element.ExecutableFlowNode;
 import io.zeebe.broker.workflow.processor.BpmnStepContext;
+import io.zeebe.broker.workflow.state.WorkflowState;
 import io.zeebe.model.bpmn.instance.zeebe.ZeebeOutputBehavior;
 import io.zeebe.msgpack.mapping.Mapping;
 import io.zeebe.msgpack.mapping.MsgPackMergeTool;
@@ -50,19 +51,26 @@ public class IOMappingHelper {
     }
   }
 
-  public <T extends ExecutableFlowNode> DirectBuffer applyInputMappings(
-      BpmnStepContext<T> context) {
-    final WorkflowInstanceRecord record = context.getValue();
+  public <T extends ExecutableFlowNode> void applyInputMappings(
+      WorkflowState state, BpmnStepContext<T> context) {
+    // TODO: better structure all of this
+
+    final WorkflowInstanceRecord value = context.getValue();
     final MsgPackMergeTool mergeTool = context.getMergeTool();
     final T element = context.getElement();
     final Mapping[] mappings = element.getInputMappings();
 
     if (mappings.length > 0) {
       mergeTool.reset();
-      mergeTool.mergeDocumentStrictly(record.getPayload(), element.getInputMappings());
-      return mergeTool.writeResultToBuffer();
-    } else {
-      return record.getPayload();
+      mergeTool.mergeDocumentStrictly(value.getPayload(), element.getInputMappings());
+      final DirectBuffer mappedPayload = mergeTool.writeResultToBuffer();
+      context.getValue().setPayload(mappedPayload);
+
+      // TODO: wow, method chains
+      state
+          .getElementInstanceState()
+          .getVariablesState()
+          .setVariablesLocalFromDocument(context.getRecord().getKey(), mappedPayload);
     }
   }
 }

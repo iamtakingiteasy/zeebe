@@ -72,6 +72,10 @@ public class ExecutableFlowNode extends AbstractFlowElement {
     return outputBehavior;
   }
 
+  public boolean hasOutputMappings() {
+    return outputMappings.length > 0;
+  }
+
   public void setOutputBehavior(ZeebeOutputBehavior outputBehavior) {
     this.outputBehavior = outputBehavior;
   }
