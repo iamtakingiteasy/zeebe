@@ -65,7 +65,7 @@ public class MessageSubscriptionState implements StateLifecycleListener {
 
   private final ExpandableArrayBuffer keyBuffer = new ExpandableArrayBuffer();
   private final ExpandableArrayBuffer valueBuffer = new ExpandableArrayBuffer();
-  private final UnsafeBuffer iterateKeyBuffer = new UnsafeBuffer(0, 0);
+  private final UnsafeBuffer bufferView = new UnsafeBuffer(0, 0);
 
   private final MessageSubscription subscription = new MessageSubscription();
 
@@ -132,7 +132,7 @@ public class MessageSubscriptionState implements StateLifecycleListener {
   }
 
   private int writeSentTimeKey(MutableDirectBuffer buffer, final MessageSubscription subscription) {
-    final int expectedLength = Long.BYTES + getSubscriptionKeyLength(subscription);
+    final int expectedLength = Long.BYTES + getSubscriptionKeyLength(subscription.getMessageName());
     int offset = 0;
 
     buffer.putLong(offset, subscription.getCommandSentTime(), STATE_BYTE_ORDER);
@@ -146,11 +146,16 @@ public class MessageSubscriptionState implements StateLifecycleListener {
 
   private int writeSubscriptionKey(
       MutableDirectBuffer buffer, int offset, final MessageSubscription subscription) {
-    final DirectBuffer messageName = subscription.getMessageName();
-    final int startOffset = offset;
-    final int expectedLength = getSubscriptionKeyLength(subscription);
+    return writeSubscriptionKey(
+        buffer, offset, subscription.getElementInstanceKey(), subscription.getMessageName());
+  }
 
-    buffer.putLong(offset, subscription.getElementInstanceKey(), STATE_BYTE_ORDER);
+  private int writeSubscriptionKey(
+      MutableDirectBuffer buffer, int offset, long elementInstanceKey, DirectBuffer messageName) {
+    final int startOffset = offset;
+    final int expectedLength = getSubscriptionKeyLength(messageName);
+
+    buffer.putLong(offset, elementInstanceKey, STATE_BYTE_ORDER);
     offset += Long.BYTES;
 
     offset = writeIntoBuffer(buffer, offset, messageName);
@@ -167,15 +172,16 @@ public class MessageSubscriptionState implements StateLifecycleListener {
     readIntoBuffer(source, offset, subscription.getMessageName());
   }
 
-  private int getSubscriptionKeyLength(final MessageSubscription subscription) {
-    return Long.BYTES + Integer.BYTES + subscription.getMessageName().capacity();
+  private int getSubscriptionKeyLength(DirectBuffer messageName) {
+    return Long.BYTES + Integer.BYTES + messageName.capacity();
   }
 
-  private boolean readSubscription(MessageSubscription subscription) {
-    final int keyLength = writeSubscriptionKey(keyBuffer, 0, subscription);
-    final DirectBuffer key = new UnsafeBuffer(keyBuffer, 0, keyLength);
+  private boolean readSubscription(
+      long elementInstanceKey, DirectBuffer messageName, MessageSubscription subscription) {
+    final int keyLength = writeSubscriptionKey(keyBuffer, 0, elementInstanceKey, messageName);
+    bufferView.wrap(keyBuffer, 0, keyLength);
 
-    final int readBytes = db.get(subscriptionColumnFamily, key, valueBuffer);
+    final int readBytes = db.get(subscriptionColumnFamily, bufferView, valueBuffer);
     if (readBytes != RocksDB.NOT_FOUND) {
       subscription.wrap(valueBuffer, 0, readBytes);
       return true;
@@ -188,7 +194,6 @@ public class MessageSubscriptionState implements StateLifecycleListener {
       final DirectBuffer messageName,
       final DirectBuffer correlationKey,
       MessageSubscriptionVisitor visitor) {
-
     int offset = 0;
     final int prefixLength = messageName.capacity() + correlationKey.capacity();
     final MutableDirectBuffer prefixBuffer = new UnsafeBuffer(new byte[prefixLength]);
@@ -197,22 +202,20 @@ public class MessageSubscriptionState implements StateLifecycleListener {
     offset += messageName.capacity();
 
     prefixBuffer.putBytes(offset, correlationKey, 0, correlationKey.capacity());
-    subscription.setMessageName(messageName);
 
     db.forEachPrefixed(
         messageNameAndCorrelationKeyColumnFamily,
         prefixBuffer,
         (entry, control) -> {
           final DirectBuffer keyBuffer = entry.getKey();
-          final long subscriptionKey = keyBuffer.getLong(prefixLength, STATE_BYTE_ORDER);
+          final long elementInstanceKey = keyBuffer.getLong(prefixLength, STATE_BYTE_ORDER);
 
-          subscription.setElementInstanceKey(subscriptionKey);
-          final boolean found = readSubscription(subscription);
+          final boolean found = readSubscription(elementInstanceKey, messageName, subscription);
           if (!found) {
             throw new IllegalStateException(
                 String.format(
                     "Expected to find subscription with key %d, but no subscription found",
-                    subscriptionKey));
+                    elementInstanceKey));
           }
 
           final boolean visited = visitor.visit(subscription);
@@ -268,7 +271,11 @@ public class MessageSubscriptionState implements StateLifecycleListener {
           boolean visited = false;
           if (sentTime < deadline) {
             wrapSubscriptionKey(keyBuffer, Long.BYTES, subscription);
-            final boolean found = readSubscription(subscription);
+            final boolean found =
+                readSubscription(
+                    subscription.getElementInstanceKey(),
+                    subscription.getMessageName(),
+                    subscription);
 
             if (!found) {
               throw new IllegalStateException(
@@ -289,17 +296,12 @@ public class MessageSubscriptionState implements StateLifecycleListener {
 
   public boolean existSubscriptionForElementInstance(
       long elementInstanceKey, DirectBuffer messageName) {
-    subscription.setElementInstanceKey(elementInstanceKey);
-    subscription.setMessageName(messageName);
-    final int keyLength = writeSubscriptionKey(keyBuffer, 0, subscription);
-
+    final int keyLength = writeSubscriptionKey(keyBuffer, 0, elementInstanceKey, messageName);
     return db.exists(subscriptionColumnFamily, keyBuffer.byteArray(), 0, keyLength);
   }
 
   public boolean remove(long elementInstanceKey, DirectBuffer messageName) {
-    subscription.setElementInstanceKey(elementInstanceKey);
-    subscription.setMessageName(messageName);
-    final boolean found = readSubscription(subscription);
+    final boolean found = readSubscription(elementInstanceKey, messageName, subscription);
     if (found) {
       remove(subscription);
     }

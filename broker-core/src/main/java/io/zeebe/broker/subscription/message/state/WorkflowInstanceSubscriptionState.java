@@ -59,6 +59,7 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
 
   private final ExpandableArrayBuffer keyBuffer = new ExpandableArrayBuffer();
   private final ExpandableArrayBuffer valueBuffer = new ExpandableArrayBuffer();
+  private final DirectBuffer bufferView = new UnsafeBuffer(0, 0);
 
   private final WorkflowInstanceSubscription subscription = new WorkflowInstanceSubscription();
 
@@ -99,7 +100,7 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
 
   private int writeSentTimeKey(
       MutableDirectBuffer buffer, final WorkflowInstanceSubscription subscription) {
-    final int expectedLength = Long.BYTES + getSubscriptionKeyLength(subscription);
+    final int expectedLength = Long.BYTES + getSubscriptionKeyLength(subscription.getMessageName());
     int offset = 0;
 
     buffer.putLong(offset, subscription.getCommandSentTime(), STATE_BYTE_ORDER);
@@ -113,11 +114,16 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
 
   private int writeSubscriptionKey(
       MutableDirectBuffer buffer, int offset, final WorkflowInstanceSubscription subscription) {
-    final DirectBuffer messageName = subscription.getMessageName();
-    final int startOffset = offset;
-    final int expectedLength = getSubscriptionKeyLength(subscription);
+    return writeSubscriptionKey(
+        buffer, offset, subscription.getElementInstanceKey(), subscription.getMessageName());
+  }
 
-    buffer.putLong(offset, subscription.getElementInstanceKey(), STATE_BYTE_ORDER);
+  private int writeSubscriptionKey(
+      MutableDirectBuffer buffer, int offset, long elementInstanceKey, DirectBuffer messageName) {
+    final int startOffset = offset;
+    final int expectedLength = getSubscriptionKeyLength(messageName);
+
+    buffer.putLong(offset, elementInstanceKey, STATE_BYTE_ORDER);
     offset += Long.BYTES;
 
     offset = writeIntoBuffer(buffer, offset, messageName);
@@ -136,15 +142,18 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
     readIntoBuffer(source, offset, subscription.getMessageName());
   }
 
-  private int getSubscriptionKeyLength(final WorkflowInstanceSubscription subscription) {
-    return Long.BYTES + Integer.BYTES + subscription.getMessageName().capacity();
+  private int getSubscriptionKeyLength(DirectBuffer messageName) {
+    return Long.BYTES + Integer.BYTES + messageName.capacity();
   }
 
-  private boolean readSubscription(WorkflowInstanceSubscription subscription) {
-    final int keyLength = writeSubscriptionKey(this.keyBuffer, 0, subscription);
-    final DirectBuffer keyBuffer = new UnsafeBuffer(this.keyBuffer, 0, keyLength);
+  private boolean readSubscription(
+      long elementInstanceKey,
+      DirectBuffer messageName,
+      WorkflowInstanceSubscription subscription) {
+    final int keyLength = writeSubscriptionKey(keyBuffer, 0, elementInstanceKey, messageName);
+    bufferView.wrap(keyBuffer, 0, keyLength);
 
-    final int readBytes = db.get(subscriptionColumnFamily, keyBuffer, valueBuffer);
+    final int readBytes = db.get(subscriptionColumnFamily, bufferView, valueBuffer);
     if (readBytes != RocksDB.NOT_FOUND) {
       subscription.wrap(valueBuffer, 0, readBytes);
       return true;
@@ -155,9 +164,7 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
 
   public WorkflowInstanceSubscription getSubscription(
       long elementInstanceKey, DirectBuffer messageName) {
-    subscription.setMessageName(messageName);
-    subscription.setElementInstanceKey(elementInstanceKey);
-    final boolean found = readSubscription(subscription);
+    final boolean found = readSubscription(elementInstanceKey, messageName, subscription);
 
     if (found) {
       return subscription;
@@ -176,8 +183,16 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
         prefix,
         ((entry, control) -> {
           wrapSubscriptionKey(entry.getKey(), subscription);
-          if (readSubscription(subscription)) {
+          final boolean found =
+              readSubscription(
+                  subscription.getElementInstanceKey(),
+                  subscription.getMessageName(),
+                  subscription);
+          if (found) {
             visitor.visit(subscription);
+          } else {
+            throw new IllegalStateException(
+                String.format("No subscription found with key %s", subscription));
           }
         }));
   }
@@ -197,7 +212,11 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
                 new UnsafeBuffer(keyBuffer, Long.BYTES, keyBuffer.capacity() - Long.BYTES);
             wrapSubscriptionKey(subscriptionKeyBuffer, subscription);
 
-            final boolean found = readSubscription(subscription);
+            final boolean found =
+                readSubscription(
+                    subscription.getElementInstanceKey(),
+                    subscription.getMessageName(),
+                    subscription);
             if (!found) {
               throw new IllegalStateException(
                   String.format("No subscription found with key %s", subscription));
@@ -267,10 +286,7 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
   }
 
   public boolean remove(long elementInstanceKey, DirectBuffer messageName) {
-    subscription.setElementInstanceKey(elementInstanceKey);
-    subscription.setMessageName(messageName);
-
-    final boolean found = readSubscription(subscription);
+    final boolean found = readSubscription(elementInstanceKey, messageName, subscription);
     if (found) {
       remove(subscription);
     }
